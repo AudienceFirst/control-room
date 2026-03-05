@@ -1,0 +1,268 @@
+// prisma/schema.prisma
+// Phase 1: Foundation schema — extended in later phases
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Authentication (NextAuth) ────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(CONSULTANT)
+  accounts      Account[]
+  sessions      Session[]
+  clients       Client[]  @relation("ClientCreatedBy")
+  highlightAcknowledgment HighlightAcknowledgment[]
+  createdAt     DateTime  @default(now())
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  ADMIN
+  CONSULTANT
+}
+
+// ─── Client Management ────────────────────────────────────────────────────────
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logoUrl     String?
+  clientLead  String?
+  isActive    Boolean  @default(true)
+  createdById String
+  createdBy   User     @relation("ClientCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clickupConfig       ClickUpConfig?
+  hubspotConnection   HubSpotConnection?
+  ga4Config          Ga4Config?
+  gmailConnection    GmailConnection?
+  metricConfigs      MetricConfig[]
+  sentimentSnapshot  SentimentSnapshot?
+  dashboardToken     ClientDashboardToken?
+  funnelConfig       FunnelConfig?
+
+  @@index([isActive])
+}
+
+// ─── Funnel (e.g. Nieuwestroom bestelstraat) ───────────────────────────────────
+
+model FunnelConfig {
+  id            String   @id @default(cuid())
+  clientId      String   @unique
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /** JSON array of campaign names; when non-empty, GA4 steps are filtered to sessions from these campaigns only */
+  campaignNames String   @default("[]") // e.g. ["Google Ads - Awareness", "Meta - Conversion"]
+  /** JSON array of { order, label, type: "ga4_page"|"hubspot_contacts", ga4PagePath?, hubspotLifecycleStage? } */
+  stepsJson     String   @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model ClientDashboardToken {
+  id         String   @id @default(cuid())
+  clientId   String   @unique
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash  String   // SHA-256 hex of the secret token; raw token never stored
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model GmailConnection {
+  id             String   @id @default(cuid())
+  clientId       String   @unique
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  emailAddress   String
+  accessToken    String
+  refreshToken   String
+  tokenExpiresAt DateTime
+  filterSenders   String   @default("[]") // JSON array: ["@acme.com", "contact@acme.com"]
+  lookbackDays   Int      @default(30)
+  connectedAt    DateTime @default(now())
+  lastRefreshedAt DateTime @default(now())
+  isValid        Boolean  @default(true)
+
+  @@index([clientId])
+}
+
+model SentimentSnapshot {
+  id                String    @id @default(cuid())
+  clientId          String    @unique
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  overallScore      Float     // -1.0 to 1.0
+  trend             String    // STABLE | IMPROVING | DECLINING
+  emailsAnalyzed    Int       @default(0)
+  lastEmailAt       DateTime?
+  hasEscalation     Boolean   @default(false)
+  escalationSnippet String?
+  detailsJson       String?   // JSON: { overallExplanation, emailDetails: [{subject,score,explanation,...}] }
+  analyzedAt        DateTime  @default(now())
+
+  @@index([clientId])
+}
+
+model MetricConfig {
+  id             String   @id @default(cuid())
+  clientId       String
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  label          String
+  dataSource     DataSource
+  metricKey      String
+  category       String
+  thresholdLow   Float?
+  thresholdHigh  Float?
+  thresholdUnit  String?  // "count" | "percentage" | "currency"
+  displayOrder   Int      @default(0)
+  isVisible      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  snapshots      MetricSnapshot[]
+
+  @@unique([clientId, dataSource, category, metricKey])
+  @@index([clientId])
+}
+
+enum DataSource {
+  HUBSPOT
+  GA4
+}
+
+model MetricSnapshot {
+  id             String       @id @default(cuid())
+  metricConfigId String
+  metricConfig   MetricConfig @relation(fields: [metricConfigId], references: [id], onDelete: Cascade)
+  windowStart    DateTime
+  windowEnd      DateTime
+  value          Float
+  previousValue  Float?
+  alertStatus    AlertStatus  @default(NORMAL)
+  capturedAt     DateTime    @default(now())
+
+  @@index([metricConfigId])
+}
+
+enum AlertStatus {
+  NORMAL
+  LOW
+  HIGH
+  MISSING
+}
+
+model Ga4Connection {
+  id              String   @id @default(cuid())
+  accessToken     String   // encrypted
+  refreshToken    String   // encrypted
+  tokenExpiresAt DateTime
+  connectedBy     String?  // user email who connected
+  connectedAt     DateTime @default(now())
+  lastRefreshedAt DateTime @default(now())
+}
+
+model Ga4Config {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ga4PropertyId   String   // e.g. "123456789"
+  configuredAt    DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model HubSpotConnection {
+  id             String   @id @default(cuid())
+  clientId       String   @unique
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  portalId       String
+  hubDomain      String?
+  region         String   @default("us")
+  accessToken    String
+  refreshToken   String
+  tokenExpiresAt DateTime
+  scopes         String
+  connectedAt    DateTime @default(now())
+  lastRefreshedAt DateTime @default(now())
+  isValid        Boolean  @default(true)
+
+  @@index([clientId])
+}
+
+model ClickUpConfig {
+  id                String   @id @default(cuid())
+  clientId          String   @unique
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientFolderId    String
+  estimatesFolderId String?
+  projectsFolderId  String?
+  contactsFolderId  String?
+  showCompletedDays Int      @default(7)
+  configuredAt      DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+// ─── Highlight acknowledgments ("mark as seen") ─────────────────────────────────
+
+model HighlightAcknowledgment {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  highlightKey   String
+  acknowledgedAt DateTime @default(now())
+
+  @@unique([userId, highlightKey])
+  @@index([highlightKey])
+}
