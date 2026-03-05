@@ -25,7 +25,7 @@ export async function getHubSpotConnectUrl(clientId: string): Promise<string> {
     path: "/",
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3001";
+  const baseUrl = (process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3001").replace(/\/$/, "");
   const redirectUri = `${baseUrl}/api/integrations/hubspot/callback`;
 
   return getHubSpotAuthUrl({

@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? request.nextUrl.origin;
+  const baseUrl = (process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? request.nextUrl.origin).replace(/\/$/, "");
   const redirectUri = `${baseUrl}/api/integrations/hubspot/callback`;
 
   try {
