@@ -55,15 +55,17 @@ export type HighlightItem =
       highlightKey: string;
       wasHigh: boolean;
       resolvedDaysAgo: number;
+      isNew?: boolean;
+      daysOld?: number;
     };
 
-interface HighlightsPanelProps {
-  greenItems: HighlightItem[];
-  redItems: HighlightItem[];
-  resolvedItems: HighlightItem[];
-}
+export type ActiveHighlightItem = Exclude<HighlightItem, { type: "metric_resolved" }>;
 
-type ActiveHighlightItem = Exclude<HighlightItem, { type: "metric_resolved" }>;
+interface HighlightsPanelProps {
+  greenItems: ActiveHighlightItem[];
+  redItems: ActiveHighlightItem[];
+  resolvedItems: Extract<HighlightItem, { type: "metric_resolved" }>[];
+}
 
 function ItemRow({
   item,
@@ -190,7 +192,7 @@ export function HighlightsPanel({ greenItems, redItems, resolvedItems }: Highlig
   const [markingAll, setMarkingAll] = useState(false);
   const totalItems = greenItems.length + redItems.length;
   const allKeys = [...greenItems, ...redItems].map((i) => i.highlightKey);
-  const newItems: Array<{ item: HighlightItem; variant: "red" | "green" }> = [
+  const newItems: Array<{ item: ActiveHighlightItem; variant: "red" | "green" }> = [
     ...redItems.filter((i) => i.isNew).map((item) => ({ item, variant: "red" as const })),
     ...greenItems.filter((i) => i.isNew).map((item) => ({ item, variant: "green" as const })),
   ];

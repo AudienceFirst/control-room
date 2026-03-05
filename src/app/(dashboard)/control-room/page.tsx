@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { buildTaskSummary } from "@/lib/integrations/clickup/aggregate";
 import { ControlRoomBackground } from "@/components/ControlRoomBackground";
-import type { HighlightItem } from "./HighlightsPanel";
+import type { ActiveHighlightItem, HighlightItem } from "./HighlightsPanel";
 import { ControlRoomView } from "./ControlRoomView";
 import { HighlightsPanel } from "./HighlightsPanel";
 
@@ -45,9 +45,11 @@ type ClientForHighlights = {
   } | null;
 };
 
+type ResolvedHighlightItem = Extract<HighlightItem, { type: "metric_resolved" }>;
+
 /** Build highlights that were HIGH/LOW within the last 7 days but are currently NORMAL. */
-function buildResolvedHighlights(clients: ClientForHighlights[]): HighlightItem[] {
-  const resolved: HighlightItem[] = [];
+function buildResolvedHighlights(clients: ClientForHighlights[]): ResolvedHighlightItem[] {
+  const resolved: ResolvedHighlightItem[] = [];
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   for (const client of clients) {
@@ -96,9 +98,9 @@ function buildHighlights(
   clients: ClientForHighlights[],
   tasksByClient: Array<{ tasks: { overdueCount: number } | null }>,
   acknowledgedKeys: Set<string>
-): { green: HighlightItem[]; red: HighlightItem[]; activeKeys: string[] } {
-  const green: HighlightItem[] = [];
-  const red: HighlightItem[] = [];
+): { green: ActiveHighlightItem[]; red: ActiveHighlightItem[]; activeKeys: string[] } {
+  const green: ActiveHighlightItem[] = [];
+  const red: ActiveHighlightItem[] = [];
   const activeKeys: string[] = [];
 
   clients.forEach((client, i) => {
