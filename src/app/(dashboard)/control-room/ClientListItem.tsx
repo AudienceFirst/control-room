@@ -165,7 +165,6 @@ export function ClientListItem({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-                title="Escalatie gedetecteerd"
               >
                 <path
                   strokeLinecap="round"
