@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClickUpIcon, HubSpotIcon, GA4Icon, GmailIcon } from "@/components/IntegrationIcons";
+import {
+  ClickUpIcon,
+  HubSpotIcon,
+  GA4Icon,
+  GmailIcon,
+} from "@/components/IntegrationIcons";
 import { refreshClientData } from "@/app/actions/control-room";
 import type { TaskSummary } from "@/types/snapshot";
 
@@ -24,7 +29,11 @@ export type ClientListItemProps = {
     name: string;
     clientLead: string | null;
     clickupConfig: { clientFolderId: string } | null;
-    hubspotConnection: { portalId: string; hubDomain: string | null; isValid?: boolean } | null;
+    hubspotConnection: {
+      portalId: string;
+      hubDomain: string | null;
+      isValid?: boolean;
+    } | null;
     ga4Config: { ga4PropertyId: string } | null;
     gmailConnection: { id: string; isValid?: boolean } | null;
   };
@@ -76,7 +85,9 @@ export function ClientListItem({
   const ga4Url = client.ga4Config
     ? `https://analytics.google.com/analytics/web/#/p${client.ga4Config.ga4PropertyId}`
     : null;
-  const gmailUrl = client.gmailConnection ? `/settings/clients/${client.id}?tab=sentiment` : null;
+  const gmailUrl = client.gmailConnection
+    ? `/settings/clients/${client.id}?tab=sentiment`
+    : null;
 
   const status = overallStatusDot(sentiment, tasks);
 
@@ -103,9 +114,13 @@ export function ClientListItem({
         <div className="flex min-w-0 items-center gap-3">
           <span className="relative flex h-2 w-2 shrink-0">
             {status.pulse && (
-              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${status.color} opacity-75`} />
+              <span
+                className={`absolute inline-flex h-full w-full animate-ping rounded-full ${status.color} opacity-75`}
+              />
             )}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${status.color}`} />
+            <span
+              className={`relative inline-flex h-2 w-2 rounded-full ${status.color}`}
+            />
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate font-medium text-white">{client.name}</p>
@@ -114,9 +129,20 @@ export function ClientListItem({
                 {client.clientLead}
               </span>
             )}
-            {(client.hubspotConnection?.isValid === false || client.gmailConnection?.isValid === false) && (
-              <svg className="h-3.5 w-3.5 shrink-0 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Integratie verlopen">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            {(client.hubspotConnection?.isValid === false ||
+              client.gmailConnection?.isValid === false) && (
+              <svg
+                className="h-3.5 w-3.5 shrink-0 text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
               </svg>
             )}
           </div>
@@ -129,11 +155,24 @@ export function ClientListItem({
               className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium tabular-nums ${sentimentBg(sentiment.overallScore)} ${sentimentColor(sentiment.overallScore)}`}
             >
               {sentiment.overallScore.toFixed(2)}
-              <span className="text-zinc-500">· {sentiment.emailsAnalyzed}</span>
+              <span className="text-zinc-500">
+                · {sentiment.emailsAnalyzed}
+              </span>
             </div>
             {sentiment.hasEscalation && (
-              <svg className="h-3.5 w-3.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Escalatie gedetecteerd">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                className="h-3.5 w-3.5 text-red-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                title="Escalatie gedetecteerd"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
             )}
           </div>
@@ -149,9 +188,7 @@ export function ClientListItem({
                 {tasks.overdueCount} over
               </span>
             )}
-            <span className="text-zinc-400">
-              {tasks.incompleteCount} open
-            </span>
+            <span className="text-zinc-400">{tasks.incompleteCount} open</span>
           </div>
         ) : (
           <span className="text-xs text-zinc-600">—</span>
@@ -170,7 +207,10 @@ export function ClientListItem({
             onClick={(e) => !clickupUrl && e.preventDefault()}
             className="p-1 opacity-80 hover:opacity-100"
           >
-            <ClickUpIcon className="h-3.5 w-3.5" active={!!client.clickupConfig} />
+            <ClickUpIcon
+              className="h-3.5 w-3.5"
+              active={!!client.clickupConfig}
+            />
           </a>
           <a
             href={hubspotUrl ?? "#"}
@@ -179,7 +219,10 @@ export function ClientListItem({
             onClick={(e) => !hubspotUrl && e.preventDefault()}
             className="p-1 opacity-80 hover:opacity-100"
           >
-            <HubSpotIcon className="h-3.5 w-3.5" active={!!client.hubspotConnection} />
+            <HubSpotIcon
+              className="h-3.5 w-3.5"
+              active={!!client.hubspotConnection}
+            />
           </a>
           <a
             href={ga4Url ?? "#"}
@@ -195,7 +238,10 @@ export function ClientListItem({
             onClick={(e) => !gmailUrl && e.preventDefault()}
             className="p-1 opacity-80 hover:opacity-100"
           >
-            <GmailIcon className="h-3.5 w-3.5" active={!!client.gmailConnection} />
+            <GmailIcon
+              className="h-3.5 w-3.5"
+              active={!!client.gmailConnection}
+            />
           </a>
         </div>
       </td>
@@ -207,7 +253,11 @@ export function ClientListItem({
           className="rounded p-1.5 text-zinc-500 opacity-0 transition-opacity hover:text-white hover:bg-zinc-700 group-hover:opacity-100 disabled:opacity-50"
           title="Vernieuwen"
         >
-          <span className={`inline-block text-sm ${refreshing ? "animate-spin-smooth" : ""}`}>↻</span>
+          <span
+            className={`inline-block text-sm ${refreshing ? "animate-spin-smooth" : ""}`}
+          >
+            ↻
+          </span>
         </button>
       </td>
     </tr>
