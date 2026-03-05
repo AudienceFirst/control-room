@@ -14,12 +14,14 @@ export async function acknowledgeHighlight(highlightKey: string): Promise<{
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Unauthorized" };
 
+  const userId = session.user.id;
+
   try {
     await prisma.highlightAcknowledgment.upsert({
       where: {
-        userId_highlightKey: { userId: session.user.id, highlightKey },
+        userId_highlightKey: { userId, highlightKey },
       },
-      create: { userId: session.user.id, highlightKey },
+      create: { userId, highlightKey },
       update: { acknowledgedAt: new Date() },
     });
     revalidatePath("/control-room");
@@ -41,14 +43,16 @@ export async function acknowledgeAllHighlights(highlightKeys: string[]): Promise
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Unauthorized" };
 
+  const userId = session.user.id;
+
   try {
     await Promise.all(
       highlightKeys.map((highlightKey) =>
         prisma.highlightAcknowledgment.upsert({
           where: {
-            userId_highlightKey: { userId: session.user!.id!, highlightKey },
+            userId_highlightKey: { userId, highlightKey },
           },
-          create: { userId: session.user.id, highlightKey },
+          create: { userId, highlightKey },
           update: { acknowledgedAt: new Date() },
         })
       )
