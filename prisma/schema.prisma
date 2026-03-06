@@ -50,6 +50,8 @@ model User {
   sessions      Session[]
   clients       Client[]  @relation("ClientCreatedBy")
   highlightAcknowledgment HighlightAcknowledgment[]
+  ideas         Idea[]    @relation("IdeaAuthor")
+  ideaUpvotes   IdeaUpvote[] @relation("IdeaUpvoteUser")
   createdAt     DateTime  @default(now())
 }
 
@@ -252,6 +254,32 @@ model ClickUpConfig {
   updatedAt         DateTime @updatedAt
 
   @@index([clientId])
+}
+
+// ─── Ideas board (sticky notes with upvotes) ────────────────────────────────────
+
+model Idea {
+  id          String       @id @default(cuid())
+  content     String
+  authorId    String
+  author      User         @relation("IdeaAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  upvotes     IdeaUpvote[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([authorId])
+}
+
+model IdeaUpvote {
+  id        String   @id @default(cuid())
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("IdeaUpvoteUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([ideaId, userId])
+  @@index([ideaId])
 }
 
 // ─── Highlight acknowledgments ("mark as seen") ─────────────────────────────────
