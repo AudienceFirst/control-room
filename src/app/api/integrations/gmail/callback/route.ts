@@ -12,9 +12,13 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
 
+  const baseUrl = (
+    process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? request.nextUrl.origin
+  ).replace(/\/$/, "");
+
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL("/settings/clients?error=gmail_missing_params", request.url)
+      new URL("/settings/clients?error=gmail_missing_params", baseUrl)
     );
   }
 
@@ -24,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   if (!cookieValue) {
     return NextResponse.redirect(
-      new URL("/settings/clients?error=gmail_expired", request.url)
+      new URL("/settings/clients?error=gmail_expired", baseUrl)
     );
   }
 
@@ -33,13 +37,13 @@ export async function GET(request: NextRequest) {
     parsed = JSON.parse(cookieValue);
   } catch {
     return NextResponse.redirect(
-      new URL("/settings/clients?error=gmail_invalid_state", request.url)
+      new URL("/settings/clients?error=gmail_invalid_state", baseUrl)
     );
   }
 
   if (parsed.nonce !== state) {
     return NextResponse.redirect(
-      new URL("/settings/clients?error=gmail_csrf", request.url)
+      new URL("/settings/clients?error=gmail_csrf", baseUrl)
     );
   }
 
@@ -48,12 +52,10 @@ export async function GET(request: NextRequest) {
   if (!process.env.ENCRYPTION_KEY) {
     console.error("[Gmail] ENCRYPTION_KEY is not set");
     return NextResponse.redirect(
-      new URL(`/settings/clients/${clientId}?error=gmail_config`, request.url)
+      new URL(`/settings/clients/${clientId}?error=gmail_config`, baseUrl)
     );
   }
 
-  const baseUrl =
-    process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? request.nextUrl.origin;
   const redirectUri = `${baseUrl}/api/integrations/gmail/callback`;
 
   try {
@@ -105,12 +107,12 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(`/settings/clients/${clientId}?connected=gmail&tab=sentiment`, request.url)
+      new URL(`/settings/clients/${clientId}?connected=gmail&tab=sentiment`, baseUrl)
     );
   } catch (err) {
     console.error("[Gmail] Callback error:", err);
     return NextResponse.redirect(
-      new URL(`/settings/clients/${clientId}?error=gmail_connect_failed`, request.url)
+      new URL(`/settings/clients/${clientId}?error=gmail_connect_failed`, baseUrl)
     );
   }
 }

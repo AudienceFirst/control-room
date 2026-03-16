@@ -5,6 +5,7 @@ import { scoreEmail, aggregateSentiment, type ScoredEmail } from "@/lib/sentimen
 import { scoreEmailsWithGemini } from "@/lib/sentiment/gemini-scorer";
 import { scoreEmailsWithGroq } from "@/lib/sentiment/groq-scorer";
 import { fetchGA4Metric } from "@/lib/integrations/ga4/client";
+import { parseGa4Filter } from "@/config/ga4DimensionFilters";
 import {
   fetchHubSpotMetric,
 } from "@/lib/integrations/hubspot/client";
@@ -143,6 +144,7 @@ export async function refreshMetricInternal(metricConfigId: string): Promise<num
   if (config.dataSource === "GA4") {
     const ga4Config = config.client.ga4Config;
     if (!ga4Config) return null;
+    const dimensionFilter = parseGa4Filter(config.ga4FilterKey ?? "");
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const endStr = yesterday.toISOString().slice(0, 10);
@@ -154,6 +156,7 @@ export async function refreshMetricInternal(metricConfigId: string): Promise<num
       metricName: config.metricKey,
       startDate: startStr,
       endDate: endStr,
+      dimensionFilter: dimensionFilter ?? undefined,
     });
   } else if (config.dataSource === "HUBSPOT") {
     if (!config.client.hubspotConnection) return null;

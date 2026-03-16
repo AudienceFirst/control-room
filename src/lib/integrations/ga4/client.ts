@@ -29,22 +29,39 @@ function getServiceAccountClient(): BetaAnalyticsDataClient {
 /**
  * Fetch a single metric from GA4 for a date range.
  * Uses OAuth (ruben@zuid.com / mcc@zuid.com) when connected, else service account.
+ * Optional dimensionFilter: { dimension, value } to filter by e.g. sessionDefaultChannelGroup = Organic Search.
  */
 export async function fetchGA4Metric({
   propertyId,
   metricName,
   startDate,
   endDate,
+  dimensionFilter,
 }: {
   propertyId: string;
   metricName: string;
   startDate: string;
   endDate: string;
+  /** Optional: filter by dimension (e.g. sessionDefaultChannelGroup = Organic Search) */
+  dimensionFilter?: { dimension: string; value: string };
 }): Promise<number> {
+  const body: Record<string, unknown> = {
+    dateRanges: [{ startDate, endDate }],
+    metrics: [{ name: metricName }],
+  };
+
+  if (dimensionFilter?.dimension && dimensionFilter?.value) {
+    body.dimensionFilter = {
+      filter: {
+        fieldName: dimensionFilter.dimension,
+        stringFilter: { matchType: "EXACT", value: dimensionFilter.value },
+      },
+    };
+  }
+
   const accessToken = await getValidGa4Token();
 
   if (accessToken) {
-    // OAuth: use REST API with Bearer token
     const res = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -53,10 +70,7 @@ export async function fetchGA4Metric({
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate }],
-          metrics: [{ name: metricName }],
-        }),
+        body: JSON.stringify(body),
       }
     );
 
@@ -72,13 +86,16 @@ export async function fetchGA4Metric({
     return value ? Number(value) : 0;
   }
 
-  // Service account fallback
   const client = getServiceAccountClient();
-  const [response] = await client.runReport({
+  const runReportParams: Parameters<typeof client.runReport>[0] = {
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate, endDate }],
     metrics: [{ name: metricName }],
-  });
+  };
+  if (body.dimensionFilter) {
+    runReportParams.dimensionFilter = body.dimensionFilter as never;
+  }
+  const [response] = await client.runReport(runReportParams);
 
   const value = response.rows?.[0]?.metricValues?.[0]?.value;
   return value ? Number(value) : 0;

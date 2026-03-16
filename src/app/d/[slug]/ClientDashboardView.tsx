@@ -83,6 +83,24 @@ export function ClientDashboardView({ client, tasks, funnel }: Props) {
           </div>
         )}
 
+        {/* Nieuwestroom: direct link to Orderstraatbooster funnel */}
+        {client.slug === "nieuwestroom" && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-medium uppercase tracking-widest text-zinc-500">Orderstraatbooster</h2>
+              <a
+                href={`/d/${client.slug}/funnel`}
+                className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-600"
+              >
+                Funnel rapportage →
+              </a>
+            </div>
+            <p className="mt-3 text-sm text-zinc-400">
+              UTM-gefilterde funnel van landingspagina tot klant.
+            </p>
+          </div>
+        )}
+
         {/* Funnel */}
         {funnel && funnel.steps.length > 0 && (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">

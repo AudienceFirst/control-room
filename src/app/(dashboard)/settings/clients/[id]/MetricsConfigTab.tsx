@@ -11,6 +11,11 @@ import {
 } from "@/app/actions/metrics";
 import { GA4_METRIC_CATALOG } from "@/config/ga4MetricCatalog";
 import {
+  GA4_DIMENSION_FILTERS,
+  encodeGa4Filter,
+  parseGa4Filter,
+} from "@/config/ga4DimensionFilters";
+import {
   HUBSPOT_OBJECTS,
   HUBSPOT_METRICS,
 } from "@/config/hubspotMetricCatalog";
@@ -22,6 +27,7 @@ interface MetricConfig {
   dataSource: string;
   metricKey: string;
   category: string;
+  ga4FilterKey?: string | null;
   thresholdLow: number | null;
   thresholdHigh: number | null;
   thresholdUnit: string | null;
@@ -140,7 +146,7 @@ export function MetricsConfigTab({
                     </div>
                     <p className="mt-1 text-sm text-zinc-500">
                       {m.dataSource === "GA4"
-                        ? `${m.category} · ${m.metricKey}`
+                        ? `${m.category} · ${m.metricKey}${formatGa4Filter(m.ga4FilterKey ?? null)}`
                         : `${formatHubSpotObject(m.category)} · ${formatHubSpotMetricKey(m.metricKey)}`}
                     </p>
                     {latest && (
@@ -219,6 +225,14 @@ export function MetricsConfigTab({
       )}
     </>
   );
+}
+
+function formatGa4Filter(filterKey: string | null): string {
+  const parsed = parseGa4Filter(filterKey ?? "");
+  if (!parsed) return "";
+  const def = GA4_DIMENSION_FILTERS[parsed.dimension as keyof typeof GA4_DIMENSION_FILTERS];
+  const valueLabel = def?.values.find((v) => v.key === parsed!.value)?.label ?? parsed.value;
+  return ` · ${valueLabel}`;
 }
 
 function inferUnit(metricKey: string, _dataSource: string): "count" | "percentage" | "currency" {
@@ -419,6 +433,8 @@ function AddMetricModal({
     hasGa4 ? "Sessions & Traffic" : "contacts"
   );
   const [metricKey, setMetricKey] = useState("");
+  const [ga4FilterDimension, setGa4FilterDimension] = useState("");
+  const [ga4FilterValue, setGa4FilterValue] = useState("");
   const [hubspotDateField, setHubspotDateField] = useState("");
   const [hubspotFilterProperty, setHubspotFilterProperty] = useState("");
   const [hubspotFilterValue, setHubspotFilterValue] = useState("");
@@ -488,6 +504,12 @@ function AddMetricModal({
         hubspotDateField: (needsDateField || needsFilterProperty) ? hubspotDateField || null : null,
         hubspotFilterProperty: needsFilterProperty ? hubspotFilterProperty || null : null,
         hubspotFilterValue: (hasFilterOptions || needsFilterProperty) ? hubspotFilterValue || null : null,
+        ga4FilterKey: dataSource === "GA4" && ga4FilterDimension && ga4FilterValue && ga4FilterValue !== "__custom:"
+          ? encodeGa4Filter(
+              ga4FilterDimension,
+              ga4FilterValue.startsWith("__custom:") ? ga4FilterValue.replace("__custom:", "") : ga4FilterValue
+            )
+          : null,
         thresholdLow: thresholdLow ? parseFloat(thresholdLow) : null,
         thresholdHigh: thresholdHigh ? parseFloat(thresholdHigh) : null,
         thresholdUnit: inferUnit(metricKey, dataSource),
@@ -641,6 +663,62 @@ onChange={() => {
                   ))}
             </div>
           </div>
+
+          {dataSource === "GA4" && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Bronfilter (optioneel)
+              </label>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                Filter de metric op kanaal, bron of medium (bijv. alleen Organic Search)
+              </p>
+              <div className="mt-2 flex gap-2">
+                <select
+                  value={ga4FilterDimension}
+                  onChange={(e) => {
+                    setGa4FilterDimension(e.target.value);
+                    setGa4FilterValue("");
+                  }}
+                  className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2.5 text-white transition-colors focus:border-blue-500/70 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                >
+                  <option value="">Geen filter</option>
+                  {(Object.entries(GA4_DIMENSION_FILTERS) as [keyof typeof GA4_DIMENSION_FILTERS, (typeof GA4_DIMENSION_FILTERS)[keyof typeof GA4_DIMENSION_FILTERS]][]).map(([dimKey, def]) => (
+                    <option key={dimKey} value={dimKey}>{def.label}</option>
+                  ))}
+                </select>
+                {ga4FilterDimension && (
+                  <div className="flex flex-1 flex-col gap-1">
+                    <select
+                      value={ga4FilterValue.startsWith("__custom:") ? "__custom:" : ga4FilterValue}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setGa4FilterValue(v === "__custom:" ? "__custom:" : v);
+                      }}
+                      className="rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2.5 text-white transition-colors focus:border-blue-500/70 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    >
+                      <option value="">Selecteer waarde</option>
+                      {(Object.keys(GA4_DIMENSION_FILTERS).includes(ga4FilterDimension)
+                        ? GA4_DIMENSION_FILTERS[ga4FilterDimension as keyof typeof GA4_DIMENSION_FILTERS].values
+                        : []
+                      ).map((v) => (
+                        <option key={v.key} value={v.key}>{v.label}</option>
+                      ))}
+                      <option value="__custom:">Andere (invoer)</option>
+                    </select>
+                    {ga4FilterValue.startsWith("__custom:") && (
+                      <input
+                        type="text"
+                        value={ga4FilterValue === "__custom:" ? "" : ga4FilterValue.replace("__custom:", "")}
+                        onChange={(e) => setGa4FilterValue(e.target.value ? `__custom:${e.target.value}` : "__custom:")}
+                        placeholder="Waarde (bijv. custom-campaign)"
+                        className="rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 transition-colors focus:border-blue-500/70 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {dataSource === "HUBSPOT" && hubspotPropsError && (
             <div className="rounded bg-amber-500/10 px-3 py-2 text-sm text-amber-400">

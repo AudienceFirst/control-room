@@ -168,11 +168,13 @@ model MetricConfig {
   thresholdUnit  String?  // "count" | "percentage" | "currency"
   displayOrder   Int      @default(0)
   isVisible      Boolean  @default(true)
+  // GA4 dimension filter: "dimension:value" e.g. "sessionDefaultChannelGroup:Organic Search", empty = no filter
+  ga4FilterKey   String   @default("")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   snapshots      MetricSnapshot[]
 
-  @@unique([clientId, dataSource, category, metricKey])
+  @@unique([clientId, dataSource, category, metricKey, ga4FilterKey])
   @@index([clientId])
 }
 

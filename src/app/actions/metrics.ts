@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { fetchGA4Metric } from "@/lib/integrations/ga4/client";
+import { parseGa4Filter } from "@/config/ga4DimensionFilters";
 import {
   fetchHubSpotMetric,
   fetchHubSpotProperties,
@@ -29,6 +30,7 @@ export async function addMetricConfig(
     hubspotDateField?: string | null;
     hubspotFilterProperty?: string | null;
     hubspotFilterValue?: string | null;
+    ga4FilterKey?: string | null;
     thresholdLow?: number | null;
     thresholdHigh?: number | null;
     thresholdUnit?: string | null;
@@ -55,6 +57,7 @@ export async function addMetricConfig(
       dataSource: data.dataSource,
       metricKey,
       category: data.category,
+      ga4FilterKey: (data.dataSource === "GA4" && data.ga4FilterKey?.trim()) ? data.ga4FilterKey.trim() : "",
       thresholdLow: data.thresholdLow ?? undefined,
       thresholdHigh: data.thresholdHigh ?? undefined,
       thresholdUnit: data.thresholdUnit ?? undefined,
@@ -147,18 +150,19 @@ export async function refreshMetricValue(metricConfigId: string): Promise<number
   if (config.dataSource === "GA4") {
     const ga4Config = config.client.ga4Config;
     if (!ga4Config) return null;
-    // 30 dagen exclusief vandaag: einddatum = gisteren, zodat 2x refreshen op een dag geen invloed heeft
+    const dimensionFilter = parseGa4Filter(config.ga4FilterKey ?? "");
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const endStr = yesterday.toISOString().slice(0, 10);
     const startDate = new Date(yesterday);
-    startDate.setDate(startDate.getDate() - 29); // 30 dagen totaal (incl. gisteren)
+    startDate.setDate(startDate.getDate() - 29);
     const startStr = startDate.toISOString().slice(0, 10);
     value = await fetchGA4Metric({
       propertyId: ga4Config.ga4PropertyId,
       metricName: config.metricKey,
       startDate: startStr,
       endDate: endStr,
+      dimensionFilter: dimensionFilter ?? undefined,
     });
   } else if (config.dataSource === "HUBSPOT") {
     const hubspot = config.client.hubspotConnection;

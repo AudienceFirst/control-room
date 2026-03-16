@@ -24,8 +24,9 @@ export async function getGmailConnectUrl(clientId: string): Promise<string> {
     path: "/",
   });
 
-  const baseUrl =
-    process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3001";
+  const baseUrl = (
+    process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3001"
+  ).replace(/\/$/, "");
   const redirectUri = `${baseUrl}/api/integrations/gmail/callback`;
 
   return getGmailAuthUrl({
