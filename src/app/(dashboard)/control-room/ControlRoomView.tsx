@@ -256,6 +256,19 @@ export function ControlRoomView({
             <span className={`text-lg ${refreshing ? "animate-spin-smooth" : ""}`}>↻</span>
             <span className="hidden sm:inline">{refreshing ? "Vernieuwen…" : "Vernieuw alles"}</span>
           </button>
+
+          <a
+            href="/cast"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-800/60 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-700/80 hover:text-white sm:px-4 sm:py-2.5 sm:text-sm"
+            title="Open cast view op groot scherm"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span className="hidden sm:inline">Cast</span>
+          </a>
         </div>
       </header>
 

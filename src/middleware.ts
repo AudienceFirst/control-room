@@ -8,6 +8,11 @@ export default auth((req) => {
   const isAuthenticated = !!req.auth;
   const isAuthPage = pathname.startsWith("/auth");
   const isPublicDashboard = pathname.startsWith(DASHBOARD_PUBLIC_PREFIX);
+  const isCastView = pathname === "/cast";
+
+  if (isCastView) {
+    return NextResponse.next();
+  }
 
   if (isPublicDashboard) {
     const res = NextResponse.next();

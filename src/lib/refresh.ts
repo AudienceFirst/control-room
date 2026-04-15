@@ -9,6 +9,7 @@ import { parseGa4Filter } from "@/config/ga4DimensionFilters";
 import {
   fetchHubSpotMetric,
 } from "@/lib/integrations/hubspot/client";
+import { fetchLinkedInFollowers } from "@/lib/integrations/linkedin/client";
 
 function parseFilterSenders(json: string): string[] {
   try {
@@ -133,7 +134,7 @@ export async function refreshMetricInternal(metricConfigId: string): Promise<num
     where: { id: metricConfigId },
     include: {
       client: {
-        include: { ga4Config: true, hubspotConnection: true },
+        include: { ga4Config: true, hubspotConnection: true, linkedInConnection: true },
       },
     },
   });
@@ -163,6 +164,9 @@ export async function refreshMetricInternal(metricConfigId: string): Promise<num
     value = await fetchHubSpotMetric(config.clientId, config.category, config.metricKey, 30, {
       excludeToday: true,
     });
+  } else if (config.dataSource === "LINKEDIN") {
+    if (!config.client.linkedInConnection) return null;
+    value = await fetchLinkedInFollowers(config.clientId);
   } else {
     return null;
   }

@@ -9,6 +9,7 @@ import {
   fetchHubSpotProperties,
   type HubSpotPropertyFields,
 } from "@/lib/integrations/hubspot/client";
+import { fetchLinkedInFollowers } from "@/lib/integrations/linkedin/client";
 import { revalidatePath } from "next/cache";
 
 export async function getHubSpotPropertiesForMetric(
@@ -24,7 +25,7 @@ export async function addMetricConfig(
   clientId: string,
   data: {
     label: string;
-    dataSource: "GA4" | "HUBSPOT";
+    dataSource: "GA4" | "HUBSPOT" | "LINKEDIN";
     metricKey: string;
     category: string;
     hubspotDateField?: string | null;
@@ -139,7 +140,7 @@ export async function refreshMetricValue(metricConfigId: string): Promise<number
     where: { id: metricConfigId },
     include: {
       client: {
-        include: { ga4Config: true, hubspotConnection: true },
+        include: { ga4Config: true, hubspotConnection: true, linkedInConnection: true },
       },
     },
   });
@@ -170,6 +171,10 @@ export async function refreshMetricValue(metricConfigId: string): Promise<number
     value = await fetchHubSpotMetric(config.clientId, config.category, config.metricKey, 30, {
       excludeToday: true,
     });
+  } else if (config.dataSource === "LINKEDIN") {
+    const linkedin = config.client.linkedInConnection;
+    if (!linkedin) return null;
+    value = await fetchLinkedInFollowers(config.clientId);
   } else {
     return null;
   }

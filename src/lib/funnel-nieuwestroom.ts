@@ -87,13 +87,14 @@ export interface NieuwestroomFunnelInput {
   ga4PropertyId: string | null;
   hasHubSpot: boolean;
   clientId: string;
+  dateRange?: { startDate: string; endDate: string };
 }
 
 export async function fetchNieuwestroomFunnelData(
   input: NieuwestroomFunnelInput
 ): Promise<NieuwestroomFunnelData> {
   const { filters, ga4PropertyId, hasHubSpot, clientId } = input;
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = input.dateRange ?? getDateRange();
 
   // ── GA4 + HubSpot steps (parallel) ───────────────────────────────────────
   const rawValues = await Promise.all(

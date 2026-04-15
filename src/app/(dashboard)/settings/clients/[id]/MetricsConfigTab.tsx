@@ -44,6 +44,7 @@ interface MetricsConfigTabProps {
   metrics: MetricConfig[];
   hasGa4: boolean;
   hasHubSpot: boolean;
+  hasLinkedIn: boolean;
 }
 
 export function MetricsConfigTab({
@@ -51,6 +52,7 @@ export function MetricsConfigTab({
   metrics,
   hasGa4,
   hasHubSpot,
+  hasLinkedIn,
 }: MetricsConfigTabProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,13 +72,13 @@ export function MetricsConfigTab({
     }
   }
 
-  const hasAnySource = hasGa4 || hasHubSpot;
+  const hasAnySource = hasGa4 || hasHubSpot || hasLinkedIn;
 
   if (!hasAnySource) {
     return (
       <div className="rounded-xl border border-zinc-700/80 bg-zinc-800/40 p-6">
         <p className="text-zinc-400">
-          Configureer eerst GA4 of HubSpot (tab Integraties) om metrics toe te voegen.
+          Configureer eerst GA4, HubSpot of LinkedIn (tab Integraties) om metrics toe te voegen.
         </p>
       </div>
     );
@@ -125,9 +127,11 @@ export function MetricsConfigTab({
               const windowLabel =
                 m.dataSource === "GA4"
                   ? "30d"
-                  : isHubSpotTimeBounded
-                    ? "30d"
-                    : "total";
+                  : m.dataSource === "LINKEDIN"
+                    ? "nu"
+                    : isHubSpotTimeBounded
+                      ? "30d"
+                      : "total";
 
               return (
                 <div
@@ -147,7 +151,9 @@ export function MetricsConfigTab({
                     <p className="mt-1 text-sm text-zinc-500">
                       {m.dataSource === "GA4"
                         ? `${m.category} · ${m.metricKey}${formatGa4Filter(m.ga4FilterKey ?? null)}`
-                        : `${formatHubSpotObject(m.category)} · ${formatHubSpotMetricKey(m.metricKey)}`}
+                        : m.dataSource === "LINKEDIN"
+                          ? "LinkedIn · Volgers"
+                          : `${formatHubSpotObject(m.category)} · ${formatHubSpotMetricKey(m.metricKey)}`}
                     </p>
                     {latest && (
                       <p className="mt-1 text-sm text-zinc-400">
@@ -202,6 +208,7 @@ export function MetricsConfigTab({
           clientId={clientId}
           hasGa4={hasGa4}
           hasHubSpot={hasHubSpot}
+          hasLinkedIn={hasLinkedIn}
           onClose={() => setShowAddModal(false)}
           onAdded={() => {
             setShowAddModal(false);
@@ -345,7 +352,9 @@ function EditMetricModal({
         <p className="mb-4 text-sm text-zinc-500">
           {metric.dataSource === "GA4"
             ? `${metric.category} · ${metric.metricKey}`
-            : `${formatHubSpotObject(metric.category)} · ${formatHubSpotMetricKey(metric.metricKey)}`}
+            : metric.dataSource === "LINKEDIN"
+              ? "LinkedIn · Volgers"
+              : `${formatHubSpotObject(metric.category)} · ${formatHubSpotMetricKey(metric.metricKey)}`}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -417,18 +426,23 @@ function AddMetricModal({
   clientId,
   hasGa4,
   hasHubSpot,
+  hasLinkedIn,
   onClose,
   onAdded,
 }: {
   clientId: string;
   hasGa4: boolean;
   hasHubSpot: boolean;
+  hasLinkedIn: boolean;
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const [dataSource, setDataSource] = useState<"GA4" | "HUBSPOT">(
-    hasGa4 ? "GA4" : "HUBSPOT"
-  );
+  const defaultSource: "GA4" | "HUBSPOT" | "LINKEDIN" = hasGa4
+    ? "GA4"
+    : hasHubSpot
+      ? "HUBSPOT"
+      : "LINKEDIN";
+  const [dataSource, setDataSource] = useState<"GA4" | "HUBSPOT" | "LINKEDIN">(defaultSource);
   const [category, setCategory] = useState(
     hasGa4 ? "Sessions & Traffic" : "contacts"
   );
@@ -483,12 +497,14 @@ function AddMetricModal({
     (selectedMetric?.filterOptions?.length ?? 0) > 0;
 
   const canSubmit =
-    dataSource === "GA4"
-      ? !!metricKey
-      : !!metricKey &&
-        (!needsDateField || !!hubspotDateField) &&
-        (!hasFilterOptions || !!hubspotFilterValue) &&
-        (!needsFilterProperty || (!!hubspotFilterProperty && !!hubspotFilterValue && !!hubspotDateField));
+    dataSource === "LINKEDIN"
+      ? true
+      : dataSource === "GA4"
+        ? !!metricKey
+        : !!metricKey &&
+          (!needsDateField || !!hubspotDateField) &&
+          (!hasFilterOptions || !!hubspotFilterValue) &&
+          (!needsFilterProperty || (!!hubspotFilterProperty && !!hubspotFilterValue && !!hubspotDateField));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -496,6 +512,20 @@ function AddMetricModal({
     setError(null);
     setLoading(true);
     try {
+      if (dataSource === "LINKEDIN") {
+        await addMetricConfig(clientId, {
+          label: label || "LinkedIn Volgers",
+          dataSource: "LINKEDIN",
+          metricKey: "followers",
+          category: "linkedin",
+          thresholdLow: thresholdLow ? parseFloat(thresholdLow) : null,
+          thresholdHigh: thresholdHigh ? parseFloat(thresholdHigh) : null,
+          thresholdUnit: "count",
+        });
+        onAdded();
+        return;
+      }
+
       await addMetricConfig(clientId, {
         label: label || (selectedMetric?.label as string) || metricKey,
         dataSource,
@@ -551,46 +581,77 @@ function AddMetricModal({
             </div>
           )}
 
-          {(hasGa4 && hasHubSpot) && (
+          {([hasGa4, hasHubSpot, hasLinkedIn].filter(Boolean).length > 1) && (
             <div>
               <label className="block text-sm font-medium text-zinc-300">
                 Source
               </label>
-              <div className="mt-1 flex gap-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 px-4 py-2">
-                  <input
-                    type="radio"
-                    name="dataSource"
-                    checked={dataSource === "GA4"}
-                    onChange={() => {
-                      setDataSource("GA4");
-                      setCategory("Sessions & Traffic");
-                      setMetricKey("");
-                    }}
-                    className="text-white"
-                  />
-                  <span className="text-sm text-zinc-200">GA4</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 px-4 py-2">
-                  <input
-                    type="radio"
-                    name="dataSource"
-                    checked={dataSource === "HUBSPOT"}
-                    onChange={() => {
-                      setDataSource("HUBSPOT");
-                      setCategory("contacts");
-                      setMetricKey("");
-                      setHubspotDateField("");
-                      setHubspotFilterValue("");
-                    }}
-                    className="text-white"
-                  />
-                  <span className="text-sm text-zinc-200">HubSpot</span>
-                </label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {hasGa4 && (
+                  <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 px-4 py-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      checked={dataSource === "GA4"}
+                      onChange={() => {
+                        setDataSource("GA4");
+                        setCategory("Sessions & Traffic");
+                        setMetricKey("");
+                      }}
+                      className="text-white"
+                    />
+                    <span className="text-sm text-zinc-200">GA4</span>
+                  </label>
+                )}
+                {hasHubSpot && (
+                  <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 px-4 py-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      checked={dataSource === "HUBSPOT"}
+                      onChange={() => {
+                        setDataSource("HUBSPOT");
+                        setCategory("contacts");
+                        setMetricKey("");
+                        setHubspotDateField("");
+                        setHubspotFilterValue("");
+                      }}
+                      className="text-white"
+                    />
+                    <span className="text-sm text-zinc-200">HubSpot</span>
+                  </label>
+                )}
+                {hasLinkedIn && (
+                  <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 px-4 py-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      checked={dataSource === "LINKEDIN"}
+                      onChange={() => {
+                        setDataSource("LINKEDIN");
+                        setMetricKey("followers");
+                        setCategory("linkedin");
+                      }}
+                      className="text-white"
+                    />
+                    <span className="text-sm text-zinc-200">LinkedIn</span>
+                  </label>
+                )}
               </div>
             </div>
           )}
 
+          {dataSource === "LINKEDIN" && (
+            <div className="rounded-lg border border-[#0A66C2]/30 bg-[#0A66C2]/10 px-4 py-3">
+              <p className="text-sm font-medium text-blue-300">LinkedIn Volgers</p>
+              <p className="mt-1 text-xs text-zinc-400">
+                Haalt het huidige totale volgersaantal op van de gekoppelde bedrijfspagina.
+                De waarde wordt bij elke cron-run bijgewerkt.
+              </p>
+            </div>
+          )}
+
+          {dataSource !== "LINKEDIN" && (<>
           <div>
             <label className="block text-sm font-medium text-zinc-300">
               {dataSource === "GA4" ? "Category" : "Object"}
@@ -663,6 +724,7 @@ onChange={() => {
                   ))}
             </div>
           </div>
+          </>)}
 
           {dataSource === "GA4" && (
             <div>
@@ -839,14 +901,18 @@ onChange={() => {
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder={(selectedMetric?.label as string) ?? ""}
+              placeholder={
+                dataSource === "LINKEDIN"
+                  ? "LinkedIn Volgers"
+                  : ((selectedMetric?.label as string) ?? "")
+              }
               className="mt-1 w-full rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2.5 text-white transition-colors focus:border-blue-500/70 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             />
           </div>
 
           <div className="space-y-1 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
             <p className="text-xs text-zinc-500">
-              GA4: thresholds zijn voor 30 dagen. HubSpot: voor totaal. LOW &lt; X (rood), NORMAL = blauw, HIGH &gt; X (groen).
+              GA4: thresholds voor 30 dagen. HubSpot/LinkedIn: voor huidig totaal. LOW &lt; X (rood), NORMAL = blauw, HIGH &gt; X (groen).
             </p>
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div>

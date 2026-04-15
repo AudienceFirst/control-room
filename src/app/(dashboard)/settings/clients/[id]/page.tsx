@@ -24,6 +24,7 @@ export default async function ClientSettingsPage({
         hubspotConnection: true,
         ga4Config: true,
         gmailConnection: true,
+        linkedInConnection: true,
         sentimentSnapshot: true,
         dashboardToken: { select: { id: true } },
         funnelConfig: true,
@@ -77,6 +78,24 @@ export default async function ClientSettingsPage({
             Gmail verbonden — configureer filter afzenders op de Sentiment-tab
           </div>
         )}
+        {connected === "linkedin" && (
+          <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">
+            LinkedIn verbonden — voeg een Volgers-metric toe op de Metrics-tab
+          </div>
+        )}
+        {error?.startsWith("linkedin_") && (
+          <div className="mt-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {error === "linkedin_config"
+              ? "Server misconfiguration: ENCRYPTION_KEY moet ingesteld zijn."
+              : error === "linkedin_expired"
+                ? "Verbinding verlopen. Probeer opnieuw."
+                : error === "linkedin_no_pages"
+                  ? "Geen LinkedIn-bedrijfspagina's gevonden waarvoor je beheerder bent."
+                  : error === "linkedin_denied"
+                    ? "LinkedIn-toegang geweigerd."
+                    : "LinkedIn verbinding mislukt. Probeer opnieuw."}
+          </div>
+        )}
         {error?.startsWith("hubspot_") && (
           <div className="mt-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {error === "hubspot_config"
@@ -108,6 +127,7 @@ export default async function ClientSettingsPage({
             ga4Config: client.ga4Config ?? null,
             ga4Connection: ga4Connection ?? null,
             gmailConnection: client.gmailConnection ?? null,
+            linkedInConnection: client.linkedInConnection ?? null,
             sentimentSnapshot: client.sentimentSnapshot ?? null,
             hasDashboardToken: !!client.dashboardToken,
             funnelConfig: funnelConfig

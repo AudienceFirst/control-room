@@ -64,6 +64,16 @@ textarea:focus-visible {
   animation: spin-smooth 0.8s linear infinite;
 }
 
+/* ─── Cast view: progress bar animation ──────────────────────────────────── */
+@keyframes cast-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.cast-progress {
+  animation: cast-progress 15s linear forwards;
+}
+
 /* Dark scrollbar for panels */
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;

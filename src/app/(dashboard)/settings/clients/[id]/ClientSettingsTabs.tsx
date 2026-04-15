@@ -9,6 +9,7 @@ import { MetricsConfigTab } from "./MetricsConfigTab";
 import { GmailConfigForm } from "./GmailConfigForm";
 import { GA4ConnectionCard } from "../GA4ConnectionCard";
 import { HubSpotConfigForm } from "./HubSpotConfigForm";
+import { LinkedInConfigForm } from "./LinkedInConfigForm";
 import { DashboardShareCard } from "./DashboardShareCard";
 
 type Tab = "general" | "integrations" | "metrics" | "funnel" | "sentiment";
@@ -50,6 +51,13 @@ interface ClientSettingsTabsProps {
       lookbackDays: number;
       isValid: boolean;
       lastRefreshedAt: Date;
+    } | null;
+    linkedInConnection: {
+      organizationId: string;
+      organizationName: string;
+      isValid: boolean;
+      lastRefreshedAt: Date;
+      tokenExpiresAt: Date;
     } | null;
     sentimentSnapshot: {
       overallScore: number;
@@ -184,6 +192,10 @@ export function ClientSettingsTabs({ client, initialTab }: ClientSettingsTabsPro
               config={client.clickupConfig}
             />
           </div>
+          <LinkedInConfigForm
+            clientId={client.id}
+            connection={client.linkedInConnection}
+          />
           <div className="rounded-xl border border-zinc-700/80 bg-zinc-800/40 p-6">
             <h3 className="mb-2 text-lg font-medium text-white">Gmail Sentiment</h3>
             <p className="mb-4 text-sm text-zinc-400">
@@ -232,6 +244,7 @@ export function ClientSettingsTabs({ client, initialTab }: ClientSettingsTabsPro
           metrics={client.metricConfigs}
           hasGa4={!!client.ga4Connection && !!client.ga4Config}
           hasHubSpot={!!client.hubspotConnection}
+          hasLinkedIn={!!client.linkedInConnection}
         />
         </div>
       )}
