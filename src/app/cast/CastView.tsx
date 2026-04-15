@@ -18,6 +18,8 @@ type MetricConfig = {
   dataSource: string;
   metricKey: string;
   thresholdUnit: string | null;
+  thresholdLow: number | null;
+  thresholdHigh: number | null;
   snapshots: Snapshot[];
 };
 
@@ -87,40 +89,90 @@ function maxDaysForStatus(configs: MetricConfig[], status: "HIGH" | "LOW"): numb
 
 function Sparkline({
   values,
+  dates,
   previousValue,
   alertStatus,
+  thresholdLow,
+  thresholdHigh,
 }: {
   values: number[];
+  dates?: (Date | string)[];
   previousValue?: number | null;
   alertStatus?: string;
+  thresholdLow?: number | null;
+  thresholdHigh?: number | null;
 }) {
   const color =
-    alertStatus === "LOW"
-      ? "#f87171"
-      : alertStatus === "HIGH"
-        ? "#34d399"
-        : "#71717a";
+    alertStatus === "LOW" ? "#f87171" : alertStatus === "HIGH" ? "#34d399" : "#71717a";
 
   if (values.length >= 2) {
     const v = [...values].reverse();
-    const min = Math.min(...v);
-    const max = Math.max(...v);
-    const range = max - min || 1;
-    const W = 72;
-    const H = 24;
+    const ts = dates ? [...dates].reverse().map((d) => new Date(d).getTime()) : null;
+
+    const allVals = [
+      ...v,
+      ...(thresholdLow != null ? [thresholdLow] : []),
+      ...(thresholdHigh != null ? [thresholdHigh] : []),
+    ];
+    const minV = Math.min(...allVals);
+    const maxV = Math.max(...allVals);
+    const rawRange = maxV - minV || 1;
+    const pad10 = rawRange * 0.12;
+    const domainMin = minV - pad10;
+    const domainMax = maxV + pad10;
+    const domainRange = domainMax - domainMin;
+
+    const W = 96;
+    const H = 32;
+    const padPx = 2;
+
+    const toY = (val: number) =>
+      H - padPx - ((val - domainMin) / domainRange) * (H - padPx * 2);
+
+    const toX = (i: number): number => {
+      if (ts && ts.length >= 2) {
+        const t0 = ts[0];
+        const t1 = ts[ts.length - 1];
+        return ((ts[i] - t0) / (t1 - t0 || 1)) * W;
+      }
+      return (i / (v.length - 1)) * W;
+    };
+
     const points = v
-      .map((val, i) => {
-        const x = (i / (v.length - 1)) * W;
-        const y = H - ((val - min) / range) * (H - 4) - 2;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
+      .map((val, i) => `${toX(i).toFixed(1)},${toY(val).toFixed(1)}`)
       .join(" ");
+
     return (
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0 opacity-90">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0">
+        {/* Band between thresholds */}
+        {thresholdLow != null && thresholdHigh != null && (
+          <rect
+            x={0} y={toY(thresholdHigh)}
+            width={W}
+            height={Math.abs(toY(thresholdLow) - toY(thresholdHigh))}
+            fill="#34d399" opacity="0.07"
+          />
+        )}
+        {/* Threshold lines */}
+        {thresholdLow != null && (
+          <line
+            x1={0} y1={toY(thresholdLow).toFixed(1)}
+            x2={W} y2={toY(thresholdLow).toFixed(1)}
+            stroke="#f87171" strokeWidth="1.5" strokeDasharray="4,3"
+          />
+        )}
+        {thresholdHigh != null && (
+          <line
+            x1={0} y1={toY(thresholdHigh).toFixed(1)}
+            x2={W} y2={toY(thresholdHigh).toFixed(1)}
+            stroke="#34d399" strokeWidth="1.5" strokeDasharray="4,3"
+          />
+        )}
+        {/* Value line */}
         <polyline
           fill="none"
           stroke={color}
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={points}
@@ -130,14 +182,13 @@ function Sparkline({
   }
 
   if (values.length === 1 && previousValue != null) {
-    const v = values[0];
-    const arrow = v > previousValue ? "↗" : v < previousValue ? "↘" : "→";
-    const c =
-      v > previousValue ? "text-emerald-400" : v < previousValue ? "text-red-400" : "text-zinc-500";
+    const val = values[0];
+    const arrow = val > previousValue ? "↗" : val < previousValue ? "↘" : "→";
+    const c = val > previousValue ? "text-emerald-400" : val < previousValue ? "text-red-400" : "text-zinc-500";
     return <span className={`shrink-0 text-2xl font-light ${c}`}>{arrow}</span>;
   }
 
-  return <span className="shrink-0 w-[72px] h-px bg-zinc-700/40 rounded self-center" />;
+  return <span className="shrink-0 w-24 h-px bg-zinc-700/40 rounded self-center" />;
 }
 
 // ─── ClientPanel ─────────────────────────────────────────────────────────────
@@ -226,15 +277,27 @@ function ClientPanel({ client }: { client: Client | null }) {
                 : "text-zinc-300";
 
           const trendValues = m.snapshots.map((s) => s.value);
+          const trendDates = m.snapshots.map((s) => s.capturedAt);
+          const isAlert = status === "LOW" || status === "HIGH";
+          const daysOld = isAlert ? alertDaysOld(m.snapshots) : null;
 
           return (
             <div key={m.id} className="flex items-center gap-4">
               {/* Status dot */}
               <div className={`w-3 h-3 rounded-full shrink-0 ${dotClass}`} />
 
-              {/* Value */}
-              <div className={`font-mono font-bold tabular-nums shrink-0 ${vSize} ${valueColor}`} style={{ minWidth: "9ch" }}>
-                {snap ? formatValue(snap.value, m.thresholdUnit) : "—"}
+              {/* Value + days badge */}
+              <div className="flex items-baseline gap-2 shrink-0" style={{ minWidth: "9ch" }}>
+                <span className={`font-mono font-bold tabular-nums ${vSize} ${valueColor}`}>
+                  {snap ? formatValue(snap.value, m.thresholdUnit) : "—"}
+                </span>
+                {daysOld !== null && (
+                  <span className={`text-sm font-medium tabular-nums ${
+                    status === "LOW" ? "text-red-400" : "text-emerald-400"
+                  }`}>
+                    {daysOld}d
+                  </span>
+                )}
               </div>
 
               {/* Label */}
@@ -245,8 +308,11 @@ function ClientPanel({ client }: { client: Client | null }) {
               {/* Sparkline */}
               <Sparkline
                 values={trendValues}
+                dates={trendDates}
                 previousValue={snap?.previousValue}
                 alertStatus={snap?.alertStatus}
+                thresholdLow={m.thresholdLow}
+                thresholdHigh={m.thresholdHigh}
               />
             </div>
           );
