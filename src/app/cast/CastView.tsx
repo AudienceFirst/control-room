@@ -150,7 +150,7 @@ function Sparkline({
             x={0} y={toY(thresholdHigh)}
             width={W}
             height={Math.abs(toY(thresholdLow) - toY(thresholdHigh))}
-            fill="#34d399" opacity="0.07"
+            fill="#71717a" opacity="0.07"
           />
         )}
         {/* Threshold lines */}
@@ -158,14 +158,14 @@ function Sparkline({
           <line
             x1={0} y1={toY(thresholdLow).toFixed(1)}
             x2={W} y2={toY(thresholdLow).toFixed(1)}
-            stroke="#f87171" strokeWidth="1.5" strokeDasharray="4,3"
+            stroke="#71717a" strokeWidth="1.5" strokeDasharray="4,3"
           />
         )}
         {thresholdHigh != null && (
           <line
             x1={0} y1={toY(thresholdHigh).toFixed(1)}
             x2={W} y2={toY(thresholdHigh).toFixed(1)}
-            stroke="#34d399" strokeWidth="1.5" strokeDasharray="4,3"
+            stroke="#71717a" strokeWidth="1.5" strokeDasharray="4,3"
           />
         )}
         {/* Value line */}

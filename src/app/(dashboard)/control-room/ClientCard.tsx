@@ -78,13 +78,13 @@ function MetricTrend({
 
     return (
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0">
-        {/* Threshold bands */}
+        {/* Threshold band */}
         {thresholdLow != null && thresholdHigh != null && (
           <rect
             x={0} y={toY(thresholdHigh)}
             width={W}
             height={Math.abs(toY(thresholdLow) - toY(thresholdHigh))}
-            fill="#34d399" opacity="0.06"
+            fill="#71717a" opacity="0.06"
           />
         )}
         {/* Threshold lines */}
@@ -92,14 +92,14 @@ function MetricTrend({
           <line
             x1={0} y1={toY(thresholdLow).toFixed(1)}
             x2={W} y2={toY(thresholdLow).toFixed(1)}
-            stroke="#f87171" strokeWidth="1.2" strokeDasharray="3,2"
+            stroke="#71717a" strokeWidth="1.2" strokeDasharray="3,2"
           />
         )}
         {thresholdHigh != null && (
           <line
             x1={0} y1={toY(thresholdHigh).toFixed(1)}
             x2={W} y2={toY(thresholdHigh).toFixed(1)}
-            stroke="#34d399" strokeWidth="1.2" strokeDasharray="3,2"
+            stroke="#71717a" strokeWidth="1.2" strokeDasharray="3,2"
           />
         )}
         {/* Value line */}
