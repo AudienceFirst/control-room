@@ -262,6 +262,11 @@ export default async function ControlRoomPage() {
     });
   }
 
+  // Most recent snapshot across all clients
+  const lastUpdatedAt = clients
+    .flatMap((c) => c.metricConfigs.flatMap((m) => m.snapshots.map((s) => s.capturedAt)))
+    .reduce<Date | null>((max, d) => (!max || d > max ? d : max), null);
+
   return (
     <div className="relative">
       <div className="relative px-4 py-6 sm:px-6 md:px-8 lg:px-10 lg:pr-84">
@@ -271,6 +276,7 @@ export default async function ControlRoomPage() {
           tasksByClient={tasksByClient}
           clickupWorkspaceId={process.env.CLICKUP_WORKSPACE_ID ?? null}
           hubspotRegion={process.env.HUBSPOT_REGION ?? "us"}
+          lastUpdatedAt={lastUpdatedAt}
         />
       </div>
 

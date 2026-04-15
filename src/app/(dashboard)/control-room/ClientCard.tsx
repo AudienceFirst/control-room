@@ -12,52 +12,109 @@ function formatMetricValue(value: number, unit: string | null): string {
   return value.toLocaleString("nl-NL");
 }
 
-/** Mini sparkline from snapshot values (newest first), or trend arrow from previousValue */
+/** Mini sparkline from snapshot values (newest first), with time-proportional x-axis and threshold lines */
 function MetricTrend({
   values,
+  dates,
   previousValue,
   alertStatus,
+  thresholdLow,
+  thresholdHigh,
 }: {
   values: number[];
+  dates?: (Date | string)[];
   previousValue?: number | null;
   alertStatus?: string;
+  thresholdLow?: number | null;
+  thresholdHigh?: number | null;
 }) {
   const strokeColor =
     alertStatus === "LOW"
-      ? "text-red-400"
+      ? "#f87171"
       : alertStatus === "HIGH"
-        ? "text-emerald-400"
-        : "text-zinc-400";
-  // Sparkline: 2+ snapshots
+        ? "#34d399"
+        : "#71717a";
+
   if (values.length >= 2) {
+    // Oldest → newest
     const v = [...values].reverse();
-    const min = Math.min(...v);
-    const max = Math.max(...v);
-    const range = max - min || 1;
-    const w = 28;
-    const h = 12;
+    const ts = dates ? [...dates].reverse().map((d) => new Date(d).getTime()) : null;
+
+    const hasThresholds = thresholdLow != null || thresholdHigh != null;
+    const allVals = [
+      ...v,
+      ...(thresholdLow != null ? [thresholdLow] : []),
+      ...(thresholdHigh != null ? [thresholdHigh] : []),
+    ];
+    const minV = Math.min(...allVals);
+    const maxV = Math.max(...allVals);
+    // Add 10% padding above/below so threshold lines aren't clipped to the edge
+    const rawRange = maxV - minV || 1;
+    const pad10 = rawRange * 0.12;
+    const domainMin = minV - pad10;
+    const domainMax = maxV + pad10;
+    const domainRange = domainMax - domainMin;
+
+    const W = hasThresholds ? 56 : 44;
+    const H = hasThresholds ? 22 : 16;
+    const padPx = 1;
+
+    const toY = (val: number) =>
+      H - padPx - ((val - domainMin) / domainRange) * (H - padPx * 2);
+
+    const toX = (i: number): number => {
+      if (ts && ts.length >= 2) {
+        const t0 = ts[0];
+        const t1 = ts[ts.length - 1];
+        const timeRange = t1 - t0 || 1;
+        return ((ts[i] - t0) / timeRange) * W;
+      }
+      return (i / (v.length - 1)) * W;
+    };
+
     const points = v
-      .map((val, i) => {
-        const x = (i / (v.length - 1)) * w;
-        const y = h - ((val - min) / range) * h;
-        return `${x},${y}`;
-      })
+      .map((val, i) => `${toX(i).toFixed(1)},${toY(val).toFixed(1)}`)
       .join(" ");
+
     return (
-      <svg width={w} height={h} className="shrink-0 opacity-80" viewBox={`0 0 ${w} ${h}`}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0">
+        {/* Threshold bands */}
+        {thresholdLow != null && thresholdHigh != null && (
+          <rect
+            x={0} y={toY(thresholdHigh)}
+            width={W}
+            height={Math.abs(toY(thresholdLow) - toY(thresholdHigh))}
+            fill="#34d399" opacity="0.06"
+          />
+        )}
+        {/* Threshold lines */}
+        {thresholdLow != null && (
+          <line
+            x1={0} y1={toY(thresholdLow).toFixed(1)}
+            x2={W} y2={toY(thresholdLow).toFixed(1)}
+            stroke="#f87171" strokeWidth="1.2" strokeDasharray="3,2"
+          />
+        )}
+        {thresholdHigh != null && (
+          <line
+            x1={0} y1={toY(thresholdHigh).toFixed(1)}
+            x2={W} y2={toY(thresholdHigh).toFixed(1)}
+            stroke="#34d399" strokeWidth="1.2" strokeDasharray="3,2"
+          />
+        )}
+        {/* Value line */}
         <polyline
           fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
+          stroke={strokeColor}
+          strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={points}
-          className={strokeColor}
         />
       </svg>
     );
   }
-  // Trend arrow: 1 snapshot met previousValue
+
   if (values.length === 1 && previousValue != null) {
     const current = values[0];
     const trend = current > previousValue ? "up" : current < previousValue ? "down" : "flat";
@@ -69,7 +126,7 @@ function MetricTrend({
       </span>
     );
   }
-  // Geen data: subtiel streepje
+
   return (
     <span className="shrink-0 w-5 h-px bg-zinc-600/50 rounded" title="Refresh voor trend" />
   );
@@ -105,12 +162,27 @@ interface ClientCardProps {
     dataSource: string;
     metricKey?: string;
     thresholdUnit: string | null;
+    thresholdLow: number | null;
+    thresholdHigh: number | null;
     snapshots: Array<{
       value: number;
       previousValue?: number | null;
       alertStatus: string;
+      capturedAt: Date;
     }>;
   }>;
+}
+
+/** Hoeveel dagen is de metric al in de huidige (HIGH/LOW) status? */
+function alertDaysOld(snapshots: Array<{ alertStatus: string; capturedAt: Date | string }>): number {
+  if (snapshots.length === 0) return 1;
+  const status = snapshots[0].alertStatus;
+  let i = 0;
+  while (i < snapshots.length && snapshots[i].alertStatus === status) i++;
+  const oldest = snapshots[i - 1];
+  if (!oldest) return 1;
+  const ms = Date.now() - new Date(oldest.capturedAt).getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
 /** Metric value color: same as sentiment (green=high, blue=normal, red=low) */
@@ -263,49 +335,78 @@ export function ClientCard({
       )}
 
       {metrics.length > 0 && (
-        <div className="mt-4 space-y-2 border-t border-zinc-700/40 pt-4">
-          <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+        <div className="mt-4 border-t border-zinc-700/40 pt-4">
+          <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-3">
             Metrics
           </div>
-          <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-3">
             {metrics.map((m) => {
               const snap = m.snapshots[0];
-              const dotColor =
-                snap?.alertStatus === "LOW"
-                  ? "bg-red-500"
-                  : snap?.alertStatus === "HIGH"
-                    ? "bg-emerald-500"
-                    : snap?.alertStatus === "NORMAL"
-                      ? "bg-blue-500"
-                      : "bg-zinc-500";
+              const isAlert = snap?.alertStatus === "LOW" || snap?.alertStatus === "HIGH";
+              const daysOld = isAlert ? alertDaysOld(m.snapshots) : null;
               const isHubSpot30d =
                 m.dataSource === "HUBSPOT" &&
                 (m.metricKey?.startsWith("count_created:") ||
                   m.metricKey?.startsWith("count_modified:") ||
                   m.metricKey?.startsWith("count_filtered:"));
               const windowLabel =
-                m.dataSource === "GA4"
-                  ? "30d"
-                  : isHubSpot30d
-                    ? "30d"
-                    : "total";
+                m.dataSource === "GA4" ? "30d" : isHubSpot30d ? "30d" : "totaal";
               const trendValues = m.snapshots.map((s) => s.value);
+              const trendDates = m.snapshots.map((s) => s.capturedAt);
+
+              const dotColor =
+                snap?.alertStatus === "LOW"
+                  ? "bg-red-500"
+                  : snap?.alertStatus === "HIGH"
+                    ? "bg-emerald-500"
+                    : "bg-zinc-600";
+
+              const bgColor =
+                snap?.alertStatus === "LOW"
+                  ? "bg-red-500/5 border-red-500/15"
+                  : snap?.alertStatus === "HIGH"
+                    ? "bg-emerald-500/5 border-emerald-500/15"
+                    : "bg-zinc-800/30 border-zinc-700/30";
+
               return (
                 <div
                   key={m.id}
-                  className="flex items-center gap-2 text-xs"
+                  className={`rounded-lg border p-2.5 ${bgColor}`}
                 >
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor} ${snap?.alertStatus === "LOW" || snap?.alertStatus === "HIGH" ? "shadow-[0_0_6px_currentColor]" : ""}`} />
-                  <span className="min-w-0 flex-1 text-white">
-                    <span className={`font-mono tabular-nums ${metricValueColor(snap?.alertStatus)}`}>{snap ? formatMetricValue(snap.value, m.thresholdUnit) : "—"}</span>
-                    <span className="ml-1">· {m.label}</span>
-                    <span className="ml-1 text-zinc-500">({windowLabel})</span>
-                  </span>
-                  <MetricTrend
-                    values={trendValues}
-                    previousValue={snap?.previousValue}
-                    alertStatus={snap?.alertStatus}
-                  />
+                  {/* Top row: dot + value + badge + sparkline */}
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dotColor} ${isAlert ? "shadow-[0_0_5px_currentColor]" : ""}`} />
+                      <span className={`text-xl font-bold tabular-nums leading-none ${metricValueColor(snap?.alertStatus)}`}>
+                        {snap ? formatMetricValue(snap.value, m.thresholdUnit) : "—"}
+                      </span>
+                      {daysOld !== null && (
+                        <span
+                          className={`shrink-0 self-end mb-0.5 rounded px-1 py-px text-[10px] font-medium tabular-nums ${
+                            snap?.alertStatus === "LOW"
+                              ? "bg-red-500/20 text-red-400"
+                              : "bg-emerald-500/20 text-emerald-400"
+                          }`}
+                          title={`${daysOld} dag${daysOld !== 1 ? "en" : ""} buiten parameters`}
+                        >
+                          {daysOld}d
+                        </span>
+                      )}
+                    </div>
+                    <MetricTrend
+                      values={trendValues}
+                      dates={trendDates}
+                      previousValue={snap?.previousValue}
+                      alertStatus={snap?.alertStatus}
+                      thresholdLow={m.thresholdLow}
+                      thresholdHigh={m.thresholdHigh}
+                    />
+                  </div>
+                  {/* Label row */}
+                  <div className="mt-1.5 flex items-center gap-1 pl-3.5">
+                    <span className="truncate text-xs text-zinc-400">{m.label}</span>
+                    <span className="shrink-0 text-[10px] text-zinc-600">· {windowLabel}</span>
+                  </div>
                 </div>
               );
             })}

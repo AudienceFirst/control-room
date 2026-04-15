@@ -35,6 +35,8 @@ export type ClientForView = {
     metricKey?: string;
     category: string;
     thresholdUnit: string | null;
+    thresholdLow: number | null;
+    thresholdHigh: number | null;
     snapshots: Array<{
       value: number;
       previousValue: number | null;
@@ -49,6 +51,7 @@ type ControlRoomViewProps = {
   tasksByClient: Array<{ tasks: TaskSummary | null; error: string | null }>;
   clickupWorkspaceId: string | null;
   hubspotRegion: string;
+  lastUpdatedAt: Date | null;
 };
 
 const FILTER_LEAD_KEY = "control-room-filter-lead";
@@ -73,11 +76,23 @@ function clientUrgencyScore(
   return score;
 }
 
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 2) return "zojuist";
+  if (diffMin < 60) return `${diffMin} min geleden`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH} uur geleden`;
+  const diffD = Math.floor(diffH / 24);
+  return `${diffD} dag${diffD !== 1 ? "en" : ""} geleden`;
+}
+
 export function ControlRoomView({
   clients,
   tasksByClient,
   clickupWorkspaceId,
   hubspotRegion,
+  lastUpdatedAt,
 }: ControlRoomViewProps) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
@@ -180,6 +195,11 @@ export function ControlRoomView({
               LIVE
             </span>
           </div>
+          {lastUpdatedAt && (
+            <p className="mt-1 text-xs text-zinc-500">
+              Bijgewerkt {formatRelativeTime(lastUpdatedAt)}
+            </p>
+          )}
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
@@ -250,10 +270,12 @@ export function ControlRoomView({
             type="button"
             onClick={handleRefreshAll}
             disabled={refreshing}
-            className="flex items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-800/60 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:border-emerald-500/40 hover:bg-zinc-700/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 sm:px-4 sm:py-2.5 sm:text-sm"
+            className="flex items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-800/60 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:border-emerald-500/40 hover:bg-zinc-700/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 sm:px-4 sm:text-sm"
             title="Vernieuw alle clients"
           >
-            <span className={`text-lg ${refreshing ? "animate-spin-smooth" : ""}`}>↻</span>
+            <svg className={`h-4 w-4 ${refreshing ? "animate-spin-smooth" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             <span className="hidden sm:inline">{refreshing ? "Vernieuwen…" : "Vernieuw alles"}</span>
           </button>
 
